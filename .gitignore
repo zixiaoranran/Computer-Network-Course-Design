@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.pcap
+run_log.txt
+sample_reversed.txt
+_new DOCX 文档.docx
