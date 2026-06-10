@@ -7,5 +7,6 @@ sample_reversed.txt
 Lib/
 Scripts/
 debug.log
-image.png
+*.png
 *.bak
+*_and_design.md
