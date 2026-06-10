@@ -3,4 +3,9 @@ __pycache__/
 *.pcap
 run_log.txt
 sample_reversed.txt
-_new DOCX 文档.docx
+新建 DOCX 文档.docx
+Lib/
+Scripts/
+debug.log
+image.png
+*.bak
