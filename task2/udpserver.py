@@ -100,7 +100,7 @@ def main():
 
                 # XOR 反算验证
                 raw_sid = (xor_id ^ XOR_KEY) & 0xFFFF
-                if raw_sid < 1000 or raw_sid > 9999:
+                if raw_sid < 0 or raw_sid > 9999:
                     log(f"[{addr}] 非法 StudentID(收到0x{xor_id:04X}, XOR还原={raw_sid}), 拒绝连接")
                     continue
 
