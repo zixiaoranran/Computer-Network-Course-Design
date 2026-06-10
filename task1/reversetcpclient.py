@@ -3,7 +3,7 @@ TCP Reverse Client — 2026春计网课程实习 Task1
 功能：将文本文件按不定长段发送给服务端反转，接收反转结果并输出到新文件。
 
 命令行参数：
-  python reversetcpclient.py <server_ip> <server_port> <Lmin> <Lmax> <chunk_seed> <input_file> <StudentID>
+  python reversetcpclient.py <server_ip> <server_port> <Lmin> <Lmax> <chunk_seed> <input_file> <学号后4位>
 
 自定义报文格式（与服务端一致，Header 9 bytes）:
   - Type:      1 byte  (0x01=Initialization, 0x02=agree, 0x03=reverseRequest, 0x04=reverseAnswer)
@@ -73,7 +73,7 @@ def parse_header(data: bytes):
 
 def main():
     if len(sys.argv) != 8:
-        print("用法: python reversetcpclient.py <server_ip> <server_port> <Lmin> <Lmax> <chunk_seed> <input_file> <StudentID>")
+        print("用法: python reversetcpclient.py <server_ip> <server_port> <Lmin> <Lmax> <chunk_seed> <input_file> <学号后4位>")
         sys.exit(1)
 
     server_ip    = sys.argv[1]

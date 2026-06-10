@@ -7,7 +7,7 @@ UDP Client (GBN Sender) — 2026春计网课程实习 Task2
   - 超时重传（300ms），统计丢包率、RTT 及 RTT 标准差
   - 详细运行日志，格式严格匹配文档要求
 
-命令行: python udpclient.py <server_ip> <server_port> <input_file> <StudentID> [pkt_size]
+命令行: python udpclient.py <server_ip> <server_port> <input_file> <学号后4位> [pkt_size]
   pkt_size: 每包载荷大小, 默认80, 范围40~80
 """
 
@@ -34,6 +34,7 @@ HEADER_SIZE   = struct.calcsize(HEADER_FORMAT)
 
 WINDOW_SIZE = 400   # 固定发送窗口 400 字节
 TIMEOUT     = 0.3    # 超时 300ms
+XOR_KEY     = 0x5A3C  # XOR 密钥
 
 
 class Logger:
@@ -66,21 +67,24 @@ def parse_packet(data: bytes):
 
 def main():
     if len(sys.argv) < 5:
-        print("用法: python udpclient.py <server_ip> <server_port> <input_file> <StudentID> [pkt_size=80]")
+        print("用法: python udpclient.py <server_ip> <server_port> <input_file> <学号后4位> [pkt_size=80]")
         sys.exit(1)
 
     server_ip   = sys.argv[1]
     server_port = int(sys.argv[2])
     input_file  = sys.argv[3]
-    student_id  = int(sys.argv[4])
+    raw_sid     = int(sys.argv[4])  # 学号后4位
     pkt_size    = int(sys.argv[5]) if len(sys.argv) >= 6 else 80
 
     if pkt_size < 40 or pkt_size > 80:
         print("错误: pkt_size 必须在 40~80 之间")
         sys.exit(1)
-    if student_id <= 0 or student_id > 65535:
-        print("错误: StudentID 必须为 1~65535")
+    if raw_sid < 1000 or raw_sid > 9999:
+        print("错误: 学号后4位必须为 1000~9999")
         sys.exit(1)
+
+    # XOR 运算
+    xor_id = (raw_sid ^ XOR_KEY) & 0xFFFF
 
     server_addr = (server_ip, server_port)
     max_pkts_in_window = WINDOW_SIZE // pkt_size  # 窗口中最大报文数
@@ -90,7 +94,7 @@ def main():
     logger = Logger(log_path)
     logger.log("=== UDP GBN Client 启动 ===")
     logger.log(f"参数: server={server_ip}:{server_port}, file={input_file}, "
-               f"StudentID={student_id}, pkt_size={pkt_size}")
+               f"学号后4位={raw_sid}, XORedID=0x{xor_id:04X}, pkt_size={pkt_size}")
     logger.log(f"GBN: 窗口={WINDOW_SIZE}字节, 每包={pkt_size}字节, 窗口最多{max_pkts_in_window}个报文, 超时={TIMEOUT*1000:.0f}ms")
 
     # ── 读取文件 ──
@@ -135,13 +139,13 @@ def main():
     # =============================================
     logger.log(">>> 阶段一: 三次握手")
 
-    # SYN (载荷: StudentID 2字节)
-    sid_bytes = struct.pack("!H", student_id)
+    # SYN (载荷: XORedID 2字节)
+    sid_bytes = struct.pack("!H", xor_id)
     client_seq = random.randint(1000, 9999)
     syn_pkt = build_packet(TYPE_SYN, client_seq, 0, sid_bytes)
     sock.sendto(syn_pkt, server_addr)
     total_sent += 1
-    logger.log(f">>> 发送 SYN seq={client_seq}, StudentID={student_id}")
+    logger.log(f">>> 发送 SYN seq={client_seq}, XORedID=0x{xor_id:04X}(原始:{raw_sid})")
 
     handshake_done = False
     retry_syn = 0

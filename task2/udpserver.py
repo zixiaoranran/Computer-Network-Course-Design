@@ -34,6 +34,7 @@ HEADER_FORMAT = "!B I I I"   # Type(1) + Seq(4) + Ack(4) + Len(4)
 HEADER_SIZE   = struct.calcsize(HEADER_FORMAT)
 
 WINDOW_SIZE = 400
+XOR_KEY     = 0x5A3C  # XOR 密钥
 
 
 def log(msg: str):
@@ -62,12 +63,11 @@ def parse_packet(data: bytes):
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: python udpserver.py <端口> [丢包概率(0~1, 默认0.15)] [合法StudentID(默认非0即合法)]")
+        print("用法: python udpserver.py <端口> [丢包概率(0~1, 默认0.15)]")
         sys.exit(1)
 
     port = int(sys.argv[1])
     loss_rate = float(sys.argv[2]) if len(sys.argv) >= 3 else 0.15
-    valid_sid_hint = int(sys.argv[3]) if len(sys.argv) >= 4 else 0  # 0 表示非0即合法
 
     log(f"UDP Server 启动, 端口 {port}, 丢包概率={loss_rate*100:.0f}%")
 
@@ -92,29 +92,25 @@ def main():
 
             # ========== 三次握手 ==========
             if msg_type == TYPE_SYN:
-                # SYN 载荷包含 StudentID (2 bytes)
+                # SYN 载荷包含 XORed StudentID (2 bytes)
                 if payload_len < 2:
                     log(f"[{addr}] SYN 载荷过短, 拒绝")
                     continue
-                student_id = struct.unpack("!H", payload[:2])[0]
+                xor_id = struct.unpack("!H", payload[:2])[0]
 
-                # 校验 StudentID
-                if valid_sid_hint > 0:
-                    valid = (student_id == valid_sid_hint)
-                else:
-                    valid = (student_id != 0)
-
-                if not valid:
-                    log(f"[{addr}] 非法 StudentID={student_id}, 拒绝连接")
+                # XOR 反算验证
+                raw_sid = (xor_id ^ XOR_KEY) & 0xFFFF
+                if raw_sid < 1000 or raw_sid > 9999:
+                    log(f"[{addr}] 非法 StudentID(收到0x{xor_id:04X}, XOR还原={raw_sid}), 拒绝连接")
                     continue
 
-                log(f"[{addr}] 收到 SYN seq={seq}, StudentID={student_id}")
+                log(f"[{addr}] 收到 SYN seq={seq}, XORedID=0x{xor_id:04X}, 学号后4位={raw_sid}")
                 server_seq = random.randint(1000, 9999)
                 client_state[addr] = {
                     "state": "established",
                     "expected_seq": 0,
                     "received_data": {},
-                    "student_id": student_id,
+                    "student_id": raw_sid,
                 }
                 synack = build_packet(TYPE_SYNACK, server_seq, seq + 1, b"")
                 sock.sendto(synack, addr)
