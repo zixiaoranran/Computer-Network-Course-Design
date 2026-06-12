@@ -192,7 +192,7 @@ def main():
         sock.sendto(pkt, server_addr)
         total_sent += 1
         packet_counter += 1
-        send_times[ci] = time.time()
+        send_times[ci] = time.perf_counter()
         n = ci + 1
         logger.log(f"第{n}个（第{bs}~{be}字节）client端已经发送")
 
@@ -208,7 +208,7 @@ def main():
         send_chunk(next_chunk)
         next_chunk += 1
         if not timer_running:
-            timer_start = time.time()
+            timer_start = time.perf_counter()
             timer_running = True
 
     # 主循环
@@ -239,7 +239,7 @@ def main():
                 if acked_until > base:
                     for ci in range(base, min(acked_until, total_chunks)):
                         if ci in send_times and ci not in chunk_ack_times:
-                            rtt = (time.time() - send_times[ci]) * 1000
+                            rtt = (time.perf_counter() - send_times[ci]) * 1000
                             rtt_samples.append(rtt)
                             chunk_ack_times[ci] = time.time()
                             n = ci + 1
@@ -249,7 +249,7 @@ def main():
 
                     base = acked_until
                     if base < total_chunks:
-                        timer_start = time.time()
+                        timer_start = time.perf_counter()
                         timer_running = True
                     else:
                         timer_running = False
@@ -261,7 +261,7 @@ def main():
 
         except socket.timeout:
             if timer_running and base < total_chunks:
-                elapsed = time.time() - timer_start
+                elapsed = time.perf_counter() - timer_start
                 if elapsed > TIMEOUT:
                     logger.log(f"[超时] 重传窗口 [base_chunk={base}, next_chunk={next_chunk})")
                     rt_count = 0
@@ -273,11 +273,11 @@ def main():
                             total_sent += 1
                             retransmissions += 1
                             rt_count += 1
-                            send_times[ci] = time.time()
+                            send_times[ci] = time.perf_counter()
                             n = ci + 1
                             logger.log(f"重传第{n}个（第{bs}~{be}字节）数据包")
                     logger.log(f"    共重传{rt_count}个报文")
-                    timer_start = time.time()
+                    timer_start = time.perf_counter()
 
     # =============================================
     # 阶段三：挥手
@@ -322,8 +322,11 @@ def main():
     logger.log(f"原始数据: {total_len} 字节, {total_chunks} 个报文段")
     logger.log(f"实际发送UDP包数: {total_sent}")
 
-    loss_rate_pct = (30 / total_sent) * 100 if total_sent > 0 else 0
-    logger.log(f"丢包率: 30/{total_sent} = {loss_rate_pct:.2f}%")
+    data_pkts = total_sent - 3  # 减去 SYN/ACK/FIN 各1个
+    dropped = data_pkts - total_chunks if data_pkts > total_chunks else 0
+    loss_rate_pct = (dropped / data_pkts) * 100 if data_pkts > 0 else 0
+    logger.log(f"总DATA包(计划{total_chunks}个, 实际发送{data_pkts}个), 丢包{dropped}个, "
+               f"丢包率: {dropped}/{data_pkts} = {loss_rate_pct:.2f}%")
 
     if rtt_samples:
         try:
